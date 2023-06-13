@@ -1,0 +1,102 @@
+CurrentFolder = pwd;
+addpath([CurrentFolder '/Utils'])
+
+T = 2000;
+
+% N = 256;NE = 128;NI= 128;
+N = 600;NE = 300;NI= 300;
+
+
+lambda = 0.65;
+
+% I_0 = lambda*f*tau;
+fs = [0.07*ones(NE,1);0.06*ones(NI,1)];
+%NeighborScale = 10; % 60 30 10 5
+%Neighbor 5  10 30 60
+W=100;
+for Ext=1:W
+N_econn = Ext;
+S_SWconn = zeros(NE);
+for postInd = 1:NE
+    for preInd = 1:NE
+        if mod(postInd-preInd,NE)<=N_econn/2 || mod(postInd-preInd,NE)>= NE-N_econn/2
+            S_SWconn(postInd,preInd) = 1;
+        end
+    end
+end
+
+S_E = repmat(S_SWconn,2,1);
+
+N_iconn = 0;
+S_Iconn = zeros(NE);
+for postInd = 1:NE
+    for preInd = 1:NE
+        if mod(postInd-preInd,NE)<=N_iconn/2 || mod(postInd-preInd,NE)>= NE-N_iconn/2
+            S_Iconn(postInd,preInd) = 1;
+        end
+    end
+end
+
+S_I = repmat(S_Iconn,2,1);
+
+
+S = [S_E,S_I];
+
+for jj = 1:N
+    S(jj,jj)=0;
+end
+
+see = 0.016;
+sei = 0.013; 
+sie = 0.018;
+sii = 0.01;
+
+dt = 0.05;
+Nevent = floor(T*lambda*2);
+eventsN = zeros(N,Nevent);
+for ii = 1:N
+    event = Poisson_Process_2(lambda,T);
+    eventsN(ii,1:length(event))=event;
+end
+
+WinSize  = 40;
+WinSlide = 20;
+%convcurve = [];
+    V_0s = rand(N,1);
+    [Vs,spike,t,SpikeCount,~,~] = ...
+        MC_Vseries_for_network_ninput_I_based_norms_Syn(dt,T,V_0s,eventsN,fs,S, ...
+                                                        see,sei,sie,sii,NE,NI,...
+                                                        WinSize, WinSlide);
+    [Sp_n,Sp_t] = find(spike == 1);    
+    %if SamInd == 1
+    %end
+    %SamInd
+    %convcurve = [convcurve;abs(mean(rate_ns(:,1:6))-mean(rate_ns(:,7)))/N];
+    spiketime = (Sp_t-1)*dt;
+    
+    num_espike = sum(spike(1:300, 20001:40001), 2);
+num_ispike = sum(spike(301:600, 20001:40001), 2);
+
+   
+    %num_spikes = sum(spike, 2);
+    num_espikes = sum(num_espike);
+num_ispikes = sum(num_ispike);
+
+    spike_erate = sum(num_espikes) / 300;
+        spike_irate = sum(num_ispikes) / 300;
+
+disp(Ext)
+
+% Compute the average spike rate across all simulation samples
+%average_spike_rate = mean(spike_rate);
+hold on
+scatter(Ext, spike_erate,'r');
+scatter(Ext, spike_irate,'b');
+
+
+hold on
+xlabel('Ext conn');
+ylabel('Spike rate');
+title('Spike rate vs. Ext conn');
+end
+
