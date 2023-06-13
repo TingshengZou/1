@@ -1,0 +1,116 @@
+CurrentFolder = pwd;
+addpath([CurrentFolder '/Utils'])
+
+T = 2000;
+
+% N = 256;NE = 128;NI= 128;
+N = 600;NE = 300;NI= 300;
+
+
+lambda = 0.65;
+
+% I_0 = lambda*f*tau;
+fs = [0.07*ones(NE,1);0.06*ones(NI,1)];
+%NeighborScale = 10; % 60 30 10 5
+%Neighbor 5  10 30 60
+W=150;
+for Ext=0:W
+N_econn = Ext;
+S_SWconn = zeros(NE);
+for postInd = 1:NE
+    for preInd = 1:NE
+        if mod(postInd-preInd,NE)<=N_econn/2 || mod(postInd-preInd,NE)>= NE-N_econn/2
+            S_SWconn(postInd,preInd) = 1;
+        end
+    end
+end
+
+S_E = repmat(S_SWconn,2,1);
+
+N_iconn = 0;
+S_Iconn = zeros(NE);
+for postInd = 1:NE
+    for preInd = 1:NE
+        if mod(postInd-preInd,NE)<=N_iconn/2 || mod(postInd-preInd,NE)>= NE-N_iconn/2
+            S_Iconn(postInd,preInd) = 1;
+        end
+    end
+end
+
+S_I = repmat(S_Iconn,2,1);
+
+
+S = [S_E,S_I];
+
+for jj = 1:N
+    S(jj,jj)=0;
+end
+
+see = 0.016;
+sei = 0.013; 
+sie = 0.018;
+sii = 0.01;
+
+dt = 0.05;
+Nevent = floor(T*lambda*2);
+eventsN = zeros(N,Nevent);
+for ii = 1:N
+    event = Poisson_Process_2(lambda,T);
+    eventsN(ii,1:length(event))=event;
+end
+
+WinSize  = 40;
+WinSlide = 20;
+%convcurve = [];
+    V_0s = rand(N,1);
+    [Vs,spike,t,SpikeCount,~,~] = ...
+        MC_Vseries_for_network_ninput_I_based_norms_Syn(dt,T,V_0s,eventsN,fs,S, ...
+                                                        see,sei,sie,sii,NE,NI,...
+                                                        WinSize, WinSlide);
+    %[Sp_n,Sp_t] = find(spike == 1);    
+    %if SamInd == 1
+    %end
+    %SamInd
+    %convcurve = [convcurve;abs(mean(rate_ns(:,1:6))-mean(rate_ns(:,7)))/N];  
+    %extKick = kick(eventsN)
+    %num_refs = sum(isnan(Vs(1:300,20001:40001, 1)));
+num_spike = sum((spike(1:300, 20001:40001,1)));
+
+     [A,~,Times] = find(eventsN);
+  R = sparse(A,floor(Times/dt)+1,ones(size(A)),N,length(t));
+  Kick = full(R);
+    %spiketime = (Sp_t-1)*dt;
+        [Neukick,Tkick] = find(Kick==1);
+        [NeuInds,TInd] = find(spike==1);
+        Kick_positions = [Neukick, Tkick];
+        Spike_positions = [NeuInds, TInd];
+        [kicked] = intersect(Kick_positions, Spike_positions, 'rows');
+    %num_spikes = sum(spike, 2);
+kick1 = (kicked(:,1) >= 0) & (kicked(:,1) <= 300);
+kick2 = (kicked(:,2) >= 20001) & (kicked(:,2) <= 40001);
+
+kicked12 = kick1 & kick2;
+
+actkicked = kicked(kicked12,:);
+
+    num_kick = size(actkicked, 1);
+num_ispikes = sum(num_spike);
+    spike_kick = sum(num_kick) / 300;
+        spike_erate = sum(num_ispikes) / 300;
+%numref = sum(Vs(1:300,20001:40001) == 0);
+%refrate=sum(numref)/300;
+disp(Ext)
+
+% Compute the average spike rate across all simulation samples
+%average_spike_rate = mean(spike_rate);
+hold on
+scatter(Ext, spike_kick,'black');
+scatter(Ext, spike_erate,'red');
+%scatter(Ext, refrate,'y');
+end
+
+
+xlabel('ext conn');
+ylabel('Spike rate');
+title('Spike rate vs. ext conn');
+
